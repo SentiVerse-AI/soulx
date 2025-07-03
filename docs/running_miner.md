@@ -6,7 +6,7 @@ This guide will walk you through the process of deploying and running a Soul X  
 * [Setup Steps](#setup-steps)
     * [1. Bittensor Wallet Setup](#1-bittensor-wallet-setup)
     * [2. Install Redis](#2-install-redis)
-    * [3. Install Soul X ](#3-install-Soul X )
+    * [3. Install Soul X](#3-install-SoulX)
     * [4. Configuration](#4-configuration)
     * [5. Running the miner](#5-running-the-miner)
     * [Important Parameters](#important-parameters)
@@ -58,7 +58,7 @@ redis-cli ping
 ```
 You should receive PONG as a response.
 
-## 3. Install Soul X 
+## 3. Install SoulX
 
 ```bash
 # Clone repository
