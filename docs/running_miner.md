@@ -178,7 +178,6 @@ This default strategy distributes mining blocks proportionally based on stake we
 4. Efficient Usage: Any remaining blocks are added to the last miner's allocation
 
 This strategy balances reward maximization (by favoring high-stake validators) while ensuring minimum coverage requirements are met for smaller stakeholders.
-![Stake based allocation](./images/stake-based-allocation.png)
 
 ### Equal distribution (Time splitting)
 
