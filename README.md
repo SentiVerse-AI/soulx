@@ -129,7 +129,7 @@ These steps apply to both miners and validators:
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/SentiVerse-AI/soulx.git](https://github.com/SentiVerse-AI/soulx.git)
+    git clone https://github.com/SentiVerse-AI/soulx.git
     cd soulx 
     ```
 

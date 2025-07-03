@@ -79,7 +79,7 @@ You can configure the miner using either a .env file (recommended) or command-li
 ### Option 1: Using .env File (Recommended)
 1. Create a `.env` file in the project root based on the provided example:
 ```bash
-cd SoulX/miner
+cd soulx/miner
 cp .env.miner.example .env
 ```
 
@@ -202,5 +202,3 @@ This strategy implements an egalitarian approach that ignores stake weights:
 - We will be expanding to support other coins and pools in the future. 
 
 - To run on different environments, check out [Subnet tutorials](https://docs.bittensor.com/tutorials/basic-subnet-tutorials)
-
-
