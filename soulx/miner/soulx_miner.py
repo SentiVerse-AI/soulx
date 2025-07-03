@@ -186,9 +186,7 @@ class SoulxAIMiner(BaseMiner):
             task_category = task['metadata'].get('category', '')
             task_type = TaskType(task_category) if task_category else TaskType.TEXT_CLASSIFICATION
             
-            if task_type == TaskType.NPC_DIALOGUE:
-                return self._process_npc_dialogue(task)
-            elif task_type in [TaskType.SENTIMENT_ANALYSIS, TaskType.EMOTION_ANALYSIS]:
+            if task_type in [TaskType.SENTIMENT_ANALYSIS, TaskType.EMOTION_ANALYSIS, TaskType.NPC_DIALOGUE]:
                 return self._process_text_sentiment(task)
             elif task_type == TaskType.SCENE_UNDERSTANDING:
                 return self._process_scene_understanding(task)
