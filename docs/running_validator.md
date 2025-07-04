@@ -5,7 +5,7 @@
   - [Setup Steps](#setup-steps)
     - [1. Bittensor Wallet Setup](#1-bittensor-wallet-setup)
     - [2. Install Redis](#2-install-redis)
-    - [3. Install Soul X](#3-install-SoulX)
+    - [3. Install SoulX](#3-install-SoulX)
     - [4. Configuration Methods](#4-configuration-methods)
       - [Option A: Using a `.env` File (Recommended)](#option-a-using-a-env-file-recommended)
       - [Option B: Using Command-Line Arguments](#option-b-using-command-line-arguments)
