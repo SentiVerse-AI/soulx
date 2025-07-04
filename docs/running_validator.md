@@ -1,6 +1,6 @@
-# Soul X Validator Setup
+# SoulX Validator Setup
 
-- [Soul X  Validator Setup ](#Soul X -validator-setup)
+- [SoulX  Validator Setup ](#SoulX -validator-setup)
   - [Prerequisites](#prerequisites)
   - [Setup Steps](#setup-steps)
     - [1. Bittensor Wallet Setup](#1-bittensor-wallet-setup)
@@ -20,7 +20,7 @@
     - [Process Management](#process-management)
   - [Support](#support)
 
-This guide will walk you through setting up and running a Soul X validator on the Bittensor network.
+This guide will walk you through setting up and running a SoulX validator on the Bittensor network.
 
 ## Prerequisites
 
@@ -174,7 +174,7 @@ Now you have two options to run the validator: using PM2 for process management 
 
 ## Important Parameters
 
-- `netuid`: Set to 115 for Soul X  subnet
+- `netuid`: Set to 115 for SoulX  subnet
 - `subtensor.network`: Set to `finney` for mainnet
 - `wallet.name`: Your Bittensor wallet name
 - `wallet.hotkey`: Your wallet's hotkey
@@ -239,5 +239,5 @@ Persistent data layer (Redis) that stores  configurations, schedules, and AI tas
 
 If you need help, you can:
 - Join the [Bittensor Discord](https://discord.com/invite/bittensor) and navigate to Subnet 115
-- Check the Soul X  documentation
+- Check the SoulX  documentation
 - To run on different environments, check out [Subnet tutorials](https://docs.bittensor.com/tutorials/basic-subnet-tutorials)
