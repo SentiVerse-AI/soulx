@@ -134,7 +134,7 @@ pm2 save
 ```
 
 ## Important Parameters
-- `netuid`: Set to 115 for Soul X  subnet
+- `netuid`: Set to 115 for SoulX  subnet
 - `subtensor.network`: Set to `finney` for mainnet
 - `wallet.name`: Your Bittensor wallet name
 - `wallet.hotkey`: Your wallet's hotkey
