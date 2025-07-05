@@ -1,16 +1,16 @@
 <div align="center">
 
-# **Soul X  (Subnet 115): Wake me, when you need me.** 
+# **SoulX  (Subnet 115): Wake me, when you need me.** 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Subnet 115](https://img.shields.io/badge/Subnet-115_Ѕ-blue)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SentiVerse-AI/SoulX)
-Welcome to Soul X  — a decentralized AI network dedicated to forging true Soul X s for the next generation of interactive entertainment.
+Welcome to SoulX  — a decentralized AI network dedicated to forging true SoulX s for the next generation of interactive entertainment.
 
 </div>
 
-# Soul X  -  Wake me, when you need me.
+# SoulX  -  Wake me, when you need me.
 
-![Soul X  Logo](./assets/logo.png)
+![SoulX  Logo](./assets/logo.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -19,7 +19,7 @@ We've all been there. You're standing in a breathtakingly beautiful game world, 
 Developers dream of creating living worlds but are constrained by the technology and cost of traditional AI. Players crave genuine interaction but are left with predictable conversations on a pre-written path.
 We believe it's time to bring a true revolution to gaming.
 Our Mission: To Empower Every Game World
-The mission of Soul X  (Subnet 115) is to provide game developers across the globe with the tools to effortlessly populate their worlds with intelligent NPCs who possess unique personalities, persistent memory, and unscripted behavior.
+The mission of SoulX  (Subnet 115) is to provide game developers across the globe with the tools to effortlessly populate their worlds with intelligent NPCs who possess unique personalities, persistent memory, and unscripted behavior.
 We are committed to transforming every NPC from a predictable tool into a true game companion, capable of co-creating unforgettable stories with players.
 We are not just generating text; we are crafting characters.
 How It Works: Rewarding True Gameplay
@@ -29,7 +29,7 @@ Validators as Game Masters:
 Validators are no longer simple prompters. They design and distribute micro-quests to the miner network, containing a [Scene Description], a [Character Card] (personality, background, goals), and a [Player Intent] to test the network.
 
 
-Miners as Soul X  Actors:
+Miners as SoulX  Actors:
 Miners drive their AI models to generate the most compelling NPC dialogue and actions that fit the context and, most importantly, drive the game forward.
 
 
@@ -51,7 +51,7 @@ Our validation system evaluates responses from a game designer's perspective acr
 
 The Pillars of Inspiration: Our Collective Gaming Memory
 A great actor needs a great script. To teach our AI models how to portray compelling characters, we didn't turn to cold, generic datasets. Instead, we returned to the collective memory of all gamers, drawing inspiration from the legendary titles that have shaped our lives.
-Disclaimer:  Soul X  is a 100% original project. We do not use any copyrighted assets (text, audio, or models) from the games listed below. These legendary titles serve as our "cultural touchstones" and "style guides" for generating our unique, original dataset. Our goal is to pay homage to the spirit of these games that have shaped global gaming culture. All trademarks are the property of their respective owners.
+Disclaimer:  SoulX  is a 100% original project. We do not use any copyrighted assets (text, audio, or models) from the games listed below. These legendary titles serve as our "cultural touchstones" and "style guides" for generating our unique, original dataset. Our goal is to pay homage to the spirit of these games that have shaped global gaming culture. All trademarks are the property of their respective owners.
 
 1. High Fantasy: The Archetypes of an Era
 
@@ -63,7 +63,7 @@ What we learn: Factional pride, iconic racial archetypes, and world-building th
 
 Our Synthetic Data Prompt: Generate a dialogue where a grumpy Orc blacksmith refuses to craft a delicate elven-style bow, viewing it as a "fragile twig."
 
-2. Sci-Fi & Cyberpunk: The Soul X s of the Future
+2. Sci-Fi & Cyberpunk: The SoulX s of the Future
 
 Inspirations: Mass Effect Trilogy, Cyberpunk 2077
 
@@ -110,14 +110,14 @@ Installation
 # Requirements
 
 ## Miner Requirements
-To run a Soul X  miner, you will need:
+To run a SoulX  miner, you will need:
 - A Bittensor wallet
 - Bittensor mining hardware (CPU, GPUs, etc.) 
 - A running Redis server for data persistence
 - Python 3.10 or higher
 
 ## Validator Requirements
-To run a Soul X  validator, you will need:
+To run a SoulX  validator, you will need:
 - A Bittensor wallet
 - A running Redis server for data persistence
 - Python 3.10 or higher environment
@@ -144,7 +144,7 @@ These steps apply to both miners and validators:
     pip install --upgrade pip
     ```
 
-4.  **Install the Soul X  package:**
+4.  **Install the SoulX  package:**
     ```bash
     pip install -e .
     ```
@@ -156,7 +156,7 @@ After completing the common setup, follow the detailed steps in the Miner Guide:
 * [Configure your miner (`.env` file or command-line arguments)](docs/running_miner.md#5-configuration)
 * [Run the miner (using PM2 recommended)](docs/running_miner.md#6-running-the-miner)
 
-For the complete, step-by-step instructions for setting up and running your miner, please refer to the [Soul X Miner Setup Guide](docs/running_miner.md).
+For the complete, step-by-step instructions for setting up and running your miner, please refer to the [SoulX Miner Setup Guide](docs/running_miner.md).
 
 ## Validator Specific Setup
 After completing the common setup, follow the detailed steps in the Validator Guide:
@@ -164,7 +164,7 @@ After completing the common setup, follow the detailed steps in the Validator Gu
 * [Configure your validator (`.env` file or command-line arguments)](docs/running_validator.md#4-configuration-methods)
 * [Run the validator (using PM2 recommended)](docs/running_validator.md#5-running-the-validator)
 
-For the complete, step-by-step instructions for setting up and running your validator, please refer to the [Soul X Validator Setup](docs/running_validator.md).
+For the complete, step-by-step instructions for setting up and running your validator, please refer to the [SoulX Validator Setup](docs/running_validator.md).
 
 # Get Involved
 
@@ -174,5 +174,5 @@ For the complete, step-by-step instructions for setting up and running your vali
 
 ---
 **Full Guides:**
-- [Soul X Miner Setup Guide ](docs/running_miner.md)
-- [Soul X Validator Setup ](docs/running_validator.md)
+- [SoulX Miner Setup Guide ](docs/running_miner.md)
+- [SoulX Validator Setup ](docs/running_validator.md)

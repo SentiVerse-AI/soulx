@@ -1,4 +1,4 @@
-# Soul X  Miner Setup Guide
+# SoulX  Miner Setup Guide
 This guide will walk you through the process of deploying and running a Soul X  miner node, enabling you to connect your local computing power to the Bittensor network and support validators in decentralized AI task processing.
 
 * [Overview](#overview)
@@ -6,7 +6,7 @@ This guide will walk you through the process of deploying and running a Soul X  
 * [Setup Steps](#setup-steps)
     * [1. Bittensor Wallet Setup](#1-bittensor-wallet-setup)
     * [2. Install Redis](#2-install-redis)
-    * [3. Install Soul X](#3-install-SoulX)
+    * [3. Install SoulX](#3-install-SoulX)
     * [4. Configuration](#4-configuration)
     * [5. Running the miner](#5-running-the-miner)
     * [Important Parameters](#important-parameters)
@@ -20,7 +20,7 @@ This guide will walk you through the process of deploying and running a Soul X  
 
 
 ## Overview
-The Soul X  miner intelligently allocates local computing power to validators based on on-chain stake weights, efficiently coordinating model processing tasks within the Bittensor network. The system is composed of the following core components:
+The SoulX  miner intelligently allocates local computing power to validators based on on-chain stake weights, efficiently coordinating model processing tasks within the Bittensor network. The system is composed of the following core components:
 
 ## Prerequisites
 1. A Bittensor wallet
@@ -134,7 +134,7 @@ pm2 save
 ```
 
 ## Important Parameters
-- `netuid`: Set to 115 for Soul X  subnet
+- `netuid`: Set to 115 for SoulX  subnet
 - `subtensor.network`: Set to `finney` for mainnet
 - `wallet.name`: Your Bittensor wallet name
 - `wallet.hotkey`: Your wallet's hotkey
@@ -146,7 +146,7 @@ pm2 save
 
 ## Incentive
 
-In Soul X , miners earn rewards by contributing hashrate to multiple validators. To maximize their returns, miners must dynamically balance their hashrate allocation and strategically respond to Alpha reward emissions.
+In SoulX , miners earn rewards by contributing hashrate to multiple validators. To maximize their returns, miners must dynamically balance their hashrate allocation and strategically respond to Alpha reward emissions.
 
 ### Goal
 Allocate your hashrate to each validator proportionally to their on-chain stake weight.
