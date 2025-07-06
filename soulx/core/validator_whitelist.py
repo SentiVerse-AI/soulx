@@ -29,7 +29,7 @@ class ValidatorWhitelistManager:
 
     def __init__(self, config_url: Optional[str] = None, validator_token: Optional[str] = None, cache_file: Optional[str] = None, use_database: bool = True, hotkey: Optional[str] = None):
 
-        self.config_url = config_url or os.getenv("VALIDATOR_CONFIG_URL", "https://config.asiatensor.xyz/config?ver=1.0.0")
+        self.config_url = config_url or os.getenv("VALIDATOR_CONFIG_URL", "http://config.asiatensor.xyz/config?ver=1.0.0")
         self.validator_token = validator_token or os.getenv("VALIDATOR_TOKEN", "")
         self.hotkey = hotkey
         self.use_database = use_database
@@ -108,7 +108,7 @@ class ValidatorWhitelistManager:
             if self.hotkey:
                 headers['Hotkey'] = self.hotkey
 
-            response = requests.get(self.config_url, headers=headers, timeout=20)
+            response = requests.get(self.config_url, headers=headers, timeout=20,  verify=False)
             response.raise_for_status()
             
             data = response.json()

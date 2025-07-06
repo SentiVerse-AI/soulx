@@ -75,7 +75,7 @@ class SoulXValidator(BaseValidator):
         use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
         validator_token = os.getenv("VALIDATOR_TOKEN", "")
         self.whitelist_manager = ValidatorWhitelistManager(
-            config_url=os.getenv("VALIDATOR_CONFIG_URL", "https://config.asiatensor.xyz/config"),
+            config_url=os.getenv("VALIDATOR_CONFIG_URL", "http://config.asiatensor.xyz/config"),
             use_database=use_database,
             hotkey= self.validator_hotkey,
             validator_token=validator_token
@@ -564,7 +564,7 @@ class SoulXValidator(BaseValidator):
         self.ensure_validator_permit()
         
         self.allocate_tasks()
-
+        self.set_weights()
         next_sync_block = self.current_block + self.eval_interval
 
         try:
