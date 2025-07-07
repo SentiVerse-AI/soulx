@@ -5,7 +5,7 @@ BLOCK_TIME = 12
 
 MAIN_PATH = Path(__file__).parent.parent.parent
 
-VERSION_KEY = 2208
+VERSION_KEY = 1001
 
 U16_MAX = 65535
 
