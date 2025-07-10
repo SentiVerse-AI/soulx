@@ -29,7 +29,9 @@ class ValidatorWhitelistManager:
 
     def __init__(self, config_url: Optional[str] = None, validator_token: Optional[str] = None, cache_file: Optional[str] = None, use_database: bool = True, hotkey: Optional[str] = None):
 
-        self.config_url = config_url or os.getenv("VALIDATOR_CONFIG_URL", "http://config.asiatensor.xyz/config?ver=1.0.0")
+        self.api_version = os.getenv("VALIDATOR_API_VERSION", "v1.0.1")
+        self.config_url = config_url or os.getenv("VALIDATOR_CONFIG_URL", "http://config.asiatensor.xyz/api/validator/config")
+        self.config_url = self.config_url + "?ver=" + self.api_version
         self.validator_token = validator_token or os.getenv("VALIDATOR_TOKEN", "")
         self.hotkey = hotkey
         self.use_database = use_database
@@ -192,8 +194,27 @@ class ValidatorWhitelistManager:
         return validator_hotkey in config.whitelist
         
     def is_validator_blacklisted(self, validator_hotkey: str) -> bool:
-        config = self.get_config()
-        return validator_hotkey in config.blacklist
+        try:
+            headers = {}
+
+            parsed_url = urlparse(self.config_url)
+
+            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+
+            config_url = f"{base_url}/api/validator/blacklist?ver=" + self.api_version
+
+            response = requests.get(config_url, headers=headers, timeout=20, verify=False)
+            response.raise_for_status()
+
+            data = response.json()
+
+            blacklist = data.get('blacklist', [])
+
+            return validator_hotkey in blacklist
+
+        except Exception as e:
+            logging.error(f"Failed to fetch validator config from server: {e}")
+            return None
         
     def get_penalty_coefficient(self) -> float:
         config = self.get_config()
@@ -366,7 +387,7 @@ class ValidatorWhitelistManager:
 
             base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
 
-            config_url = f"{base_url}/system_config/{config_key}?ver=1.0.2"
+            config_url = f"{base_url}/api/validator/system_config/{config_key}?ver=" +  self.api_version
 
             headers = {}
             if self.validator_token:
