@@ -299,7 +299,7 @@ class BaseValidator:
                 params=[self.config.netuid],
             ).value
             time_to_wait = (self.tempo - blocks_since_last_step) * BLOCK_TIME + 0.1
-            logging.error(
+            logging.info(
                 f"Validator permit not found. Waiting {time_to_wait} seconds."
             )
             target_block = self.current_block + (self.tempo - blocks_since_last_step)
