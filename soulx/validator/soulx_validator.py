@@ -564,7 +564,7 @@ class SoulXValidator(BaseValidator):
         self.ensure_validator_permit()
         
         self.allocate_tasks()
-        self.set_weights()
+        # self.set_weights()
         next_sync_block = self.current_block + self.eval_interval
 
         try:
