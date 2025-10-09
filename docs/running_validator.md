@@ -79,24 +79,24 @@ pip install --upgrade pip
 
 3. Install the package:
 ```bash
-pip install -e .
+pip install -r requirements.txt
 ```
 
 ### 4. Configuration Methods
 
 You have two ways to configure the validator:
 
-#### Option A: Using a `.env` File (Recommended)
+#### Option A: Using a `.env.validator` File (Recommended)
 
-1. Create a `.env` file in the project root based on the provided example:
+1. Create a `.env.validator` file in the project root based on the provided example:
 ```bash
 cd soulx/validator
-cp .env.validator.example .env
+cp .env.validator.example .env.validator
 ```
 
-2. Edit the `.env` file with your credentials:
+2. Edit the `.env.validator` file with your credentials:
 ```bash
-nano .env
+nano .env.validator
 cd ../.. # Return to the root dir
 ```
 

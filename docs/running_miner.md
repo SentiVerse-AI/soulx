@@ -24,7 +24,7 @@ The SoulX  miner intelligently allocates local computing power to validators bas
 
 ## Prerequisites
 1. A Bittensor wallet
-2. Bittensor mining hardware (CPU, GPUs, etc.)
+2. Bittensor mining hardware ( GPUs, etc.)
 3. Redis server for data persistence
 4. Python 3.10 or higher
 
@@ -77,16 +77,21 @@ pip install -e .
 You can configure the miner using either a .env file (recommended) or command-line arguments.
 
 ### Option 1: Using .env File (Recommended)
-1. Create a `.env` file in the project root based on the provided example:
+1. Create a `.env.miner` file in the project root based on the provided example:
 ```bash
 cd soulx/miner
-cp .env.miner.example .env
+cp .env.miner.example .env.miner
 ```
 
-2. Edit the `.env` file with your credentials:
+2. Edit the `.env.miner` file with your credentials:
 ```bash
-nano .env
+nano .env.miner
 cd ../.. # Return to the root dir
+```
+3. Create a `.env.multimodal_server` 
+```bash
+cd multimodal_server
+cp .multimodal_server.example .env.multimodal_server
 ```
 ### Option 2: Using Command-Line Arguments
 
@@ -106,12 +111,16 @@ pm2 startup
 2. Start the miner
 ```bash
 # Using .env file
-pm2 start python3 --name "SoulX-miner" -- soulx/miner/soulx_miner.py run \
+pm2 start python3 --name "SoulX-miner" -- soulx/miner/miner_server.py run \
+    --subtensor.network finney \
+    --logging.info
+    
+pm2 start python3 --name "SoulX-multimodal_server" -- multimodal_server/main.py run \
     --subtensor.network finney \
     --logging.info
 
 # Using command-line arguments
-pm2 start python3 --name "SoulX-miner" -- soulx/miner/soulx_miner.py run \
+pm2 start python3 --name "SoulX-miner" -- soulx/miner/miner_server.py run \
     --netuid 115 \
     --subtensor.network finney \
     --wallet.name YOUR_WALLET_NAME \
@@ -120,7 +129,7 @@ pm2 start python3 --name "SoulX-miner" -- soulx/miner/soulx_miner.py run \
     --logging.info
 
 # Or without PM2
-python3 soulx/miner/soulx_miner.py run \
+python3 soulx/miner/miner_server.py run \
     --netuid 115 \
     --subtensor.network finney \
     --wallet.name YOUR_WALLET_NAME \
