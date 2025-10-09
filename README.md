@@ -17,11 +17,11 @@ Our mission is to provide game developers with the power to populate their world
 *   **Improvise**: Engage in unscripted, natural dialogue that drives the narrative forward.
 *   **Feel**: Create genuine emotional resonance and forge unforgettable bonds.
 
-## ✨ Model Card: soulx-npc-large-v1
+## ✨ Model Card: SoulX
 
 | | |
 |---|---|
-| **Model Name** | `soulx-npc-large-v1` |
+| **Model Name** | `Qwen/Qwen3-32B` |
 | **Architecture** | A state-of-the-art, instruction-finetuned generative language model. |
 | **Finetuning Data** | Trained on our proprietary dataset of over 8,000 high-quality, culturally-resonant dialogue entries, meticulously crafted and inspired by legendary RPGs. |
 | **Intended Use** | Primary use is for powering real-time, interactive NPC dialogue in video games and other virtual experiences. Excellent for character-driven storytelling, dynamic quest generation, and creating believable game companions. |
@@ -39,11 +39,11 @@ import torch
 # Ensure you have the required libraries installed
 # pip install transformers torch accelerate bitsandbytes
 
-# Load the SoulX model
+# Load the  model
 # For optimal performance, we recommend using a GPU
 pipe = pipeline(
     "text-generation",
-    model="SentiVerse-AI/soulx-npc-large-v1", # Model path on Hugging Face
+    model="Qwen/Qwen3-32B", # Model path on Hugging Face
     torch_dtype=torch.bfloat16,
     device_map="auto"
 )

@@ -8,7 +8,6 @@ from soulx.core.storage.base_storage import BaseStorage
 from soulx.core.storage.utils import check_key, dumps, loads
 
 REDIS_DEFAULT_HOST = "localhost"
-REDIS_DEFAULT_PWD = ""
 REDIS_DEFAULT_PORT = 6379
 REDIS_DEFAULT_TTL = 7200
 REDIS_DEFAULT_DB = 0
@@ -19,19 +18,20 @@ class BaseRedisStorage(BaseStorage):
         self.config = config or self.get_config()
         self._port = config.redis_port or REDIS_DEFAULT_PORT
         self._host = config.redis_host or REDIS_DEFAULT_HOST
-        self._password = config.redis_password or REDIS_DEFAULT_PWD
         self._db = config.redis_db or REDIS_DEFAULT_DB
 
-        self.client = redis.Redis(host=self._host,password=self._password ,  port=self._port, db=self._db)
+        self.client = redis.Redis(host=self._host, port=self._port, db=self._db)
 
         self.ttl = config.redis_ttl or REDIS_DEFAULT_TTL
         self.update_redis_client()
         self.check_health()
 
     def update_redis_client(self):
+        """Update redis client configuration."""
         self.client.config_set(name="appendonly", value="yes")
 
     def check_health(self):
+        """Check redis connection health."""
         try:
             self.client.ping()
         except redis.exceptions.ConnectionError:
@@ -45,12 +45,6 @@ class BaseRedisStorage(BaseStorage):
             type=str,
             default=os.getenv("REDIS_HOST", REDIS_DEFAULT_HOST),
             help="Redis host",
-        )
-        redis_group.add_argument(
-            "--redis_password",
-            type=str,
-            default=os.getenv("REDIS_PASSWORD", REDIS_DEFAULT_PWD),
-            help="Redis password",
         )
         redis_group.add_argument(
             "--redis_port",

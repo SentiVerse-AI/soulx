@@ -2,12 +2,12 @@ from enum import Enum
 
 class TaskType(Enum):
 
+    
     TEXT_CLASSIFICATION = "text_classification"
     SENTIMENT_ANALYSIS = "sentiment_analysis"
     SCENE_UNDERSTANDING = "scene_understanding"
     OBJECT_DETECTION = "object_detection"
     EMOTION_ANALYSIS = "emotion_analysis"
-    NPC_DIALOGUE = "npc_dialogue"
     
     @classmethod
     def from_str(cls, category: str) -> "TaskType":
@@ -18,6 +18,7 @@ class TaskType(Enum):
             return cls.TEXT_CLASSIFICATION
             
     def get_response_format(self) -> dict:
+
         formats = {
             self.TEXT_CLASSIFICATION: {
                 "required": ["class_id", "confidence"],
@@ -62,22 +63,6 @@ class TaskType(Enum):
                     "description": "Happy",
                     "confidence": 0.85,
                     "emotion_intensity": 0.7
-                }
-            },
-            self.NPC_DIALOGUE: {
-                "required": ["dialogue_response", "metrics"],
-                "optional": ["memory_references", "emotions", "actions"],
-                "example": {
-                    "dialogue_response": "",
-                    "metrics": {
-                        "consistency": 0.95,
-                        "memory": 0.85,
-                        "creativity": 0.90,
-                        "goal_driven": 0.88
-                    },
-                    "memory_references": [""],
-                    "emotions": ["", ""],
-                    "actions": [""]
                 }
             }
         }

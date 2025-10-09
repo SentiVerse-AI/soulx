@@ -5,12 +5,13 @@ import logging as python_logging
 from bittensor import Subtensor, config, logging, Dendrite, axon
 from bittensor_wallet.bittensor_wallet import Wallet
 
-from soulx.miner.storage import get_miner_storage,  BaseRedisStorage
+from soulx.miner.storage import get_miner_storage, BaseJsonStorage, BaseRedisStorage
 
 DEFAULT_SYNC_FREQUENCY = 6
 
 class BaseMiner:
     def __init__(self):
+        """Initialize the base miner with configuration and setup."""
         self.config = self.get_config()
         self.setup_logging_path()
         self.setup_logging()
@@ -34,11 +35,13 @@ class BaseMiner:
         self._recover_schedule = self.config.recover_schedule
 
     def get_config(self):
+        """Create and parse configuration."""
         parser = argparse.ArgumentParser()
         self.add_args(parser)
         return config(parser)
 
     def setup_logging_path(self) -> None:
+        """Set up logging directory."""
         self.config.full_path = os.path.expanduser(
             "{}/{}/{}/netuid{}/{}".format(
                 self.config.logging.logging_dir,
@@ -48,9 +51,11 @@ class BaseMiner:
                 "miner",
             )
         )
+        # Ensure the logging directory exists.
         os.makedirs(self.config.full_path, exist_ok=True)
 
     def setup_logging(self) -> None:
+
         self.config.logging.logging_dir = self.config.full_path
         self.config.logging.record_log = True
 
@@ -73,6 +78,10 @@ class BaseMiner:
 
         python_logging.getLogger("bittensor").setLevel(
             getattr(python_logging, self.config.logging.level)
+        )
+
+        logging.info(
+            f"Running validator for subnet: {self.config.netuid} on network: {self.config.subtensor.network} with config:\n{self.config}"
         )
 
     def add_args(self, parser: argparse.ArgumentParser):
@@ -99,6 +108,7 @@ class BaseMiner:
             default=os.getenv("SUBTENSOR_NETWORK", "finney"),
             help="The chain subnet network.",
         )
+        # Sync frequency
         parser.add_argument(
             "--sync_frequency",
             type=int,
@@ -138,30 +148,44 @@ class BaseMiner:
             "--storage",
             type=str,
             choices=["json", "redis"],
-            default=os.getenv("STORAGE_TYPE", "redis"),
+            default=os.getenv("STORAGE_TYPE", "json"),
             help="Storage type to use (json or redis)",
         )
         parser.add_argument(
             "--neuron.axon_off",
             "--axon_off",
             action="store_true",
+            # Note: the validator needs to serve an Axon with their IP or they may
+            #   be blacklisted by the firewall of serving peers on the network.
             help="Set this flag to not attempt to serve an Axon.",
             default=False,
         )
 
         BaseRedisStorage.add_args(parser)
+        BaseJsonStorage.add_args(parser)
         Subtensor.add_args(parser)
         logging.add_args(parser)
         Wallet.add_args(parser)
 
     def setup_bittensor_objects(self) -> "Subtensor":
+        logging.info("Setting up Bittensor objects")
 
+        # Initialize wallet.
         self.wallet = Wallet(config=self.config)
+        logging.info(f"Wallet: {self.wallet}")
 
+        # Initialize subtensor.
         self.subtensor = Subtensor(config=self.config)
+        logging.info(f"Subtensor: {self.subtensor}")
 
+        # Initialize metagraph.
         self.metagraph = self.subtensor.metagraph(netuid=self.config.netuid)
         self.metagraph_info = self.subtensor.get_metagraph_info(netuid=self.config.netuid)
+        logging.info(f"Metagraph: "
+                     f"<netuid:{self.metagraph.netuid}, "
+                     f"n:{len(self.metagraph.axons)}, "
+                     f"block:{self.metagraph.block}, "
+                     f"network: {self.subtensor.network}>")
 
         if self.wallet.hotkey.ss58_address not in self.metagraph.hotkeys:
             logging.error(
@@ -171,10 +195,12 @@ class BaseMiner:
             exit()
 
         self._dendrite = Dendrite(wallet=self.wallet)
+        logging.info(f"Initialized Dendrite with wallet: {self.wallet}")
 
         self.uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
         self.miner_hotkey = self.wallet.hotkey.ss58_address
         self.current_block = self.metagraph.block
+        logging.info(f"Running miner on uid: {self.uid}")
 
         if not self.config.neuron.axon_off:
             self.serve_axon()
@@ -192,6 +218,7 @@ class BaseMiner:
 
     def serve_axon(self):
 
+        logging.info("serving ip to chain...")
         try:
             self.axon = axon(wallet=self.wallet, config=self.config)
             self.axon.start()
@@ -199,6 +226,9 @@ class BaseMiner:
                 self.subtensor.serve_axon(
                     netuid=self.config.netuid,
                     axon=self.axon,
+                )
+                logging.info(
+                    f"Running validator {self.axon} on network: {self.config.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
                 )
             except Exception as e:
                 logging.error(f"Failed to serve Axon with exception: {e}")

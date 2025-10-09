@@ -19,6 +19,7 @@ def verify_signature(public_key, message: bytes, signature: bytes) -> bool:
         )
         return True
     except Exception as e:
+        print("验证失败：", e)
         return False
 
 

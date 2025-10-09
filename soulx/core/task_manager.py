@@ -7,6 +7,15 @@ import ijson
 
 from soulx.core.storage.base_storage import BaseStorage
 from soulx.core.constants import DEFAULT_TASK_POOL_SIZE, MAX_TASK_POOL_SIZE, MAX_VALIDATOR_BLOCKS
+from soulx.core.task_type import TaskType
+import asyncio
+from functools import lru_cache
+import markovify
+from datasets import load_dataset
+import base64
+from PIL import Image
+from io import BytesIO
+import glob
 
 @dataclass
 class TaskData:
@@ -16,38 +25,6 @@ class TaskData:
     ground_truth: Optional[float] = None
     difficulty: float = 1.0
     completed: bool = False
-    
-    # NPC任务特定属性
-    scene_description: Optional[str] = None
-    npc_profile: Optional[Dict[str, Any]] = None
-    player_goal: Optional[Dict[str, Any]] = None
-    dialogue_history: Optional[List[Dict[str, str]]] = None
-    evaluation_criteria: Optional[Dict[str, float]] = None
-    
-    def is_npc_task(self) -> bool:
-        return bool(self.scene_description and self.npc_profile)
-        
-    def add_dialogue(self, speaker: str, text: str):
-        if self.dialogue_history is None:
-            self.dialogue_history = []
-        self.dialogue_history.append({"turn": speaker, "dialogue": text})
-        
-    def get_context(self) -> Dict[str, Any]:
-        if not self.is_npc_task():
-            return {"text": self.text, "metadata": self.metadata}
-            
-        return {
-            "scene_description": self.scene_description,
-            "npc_profile": self.npc_profile,
-            "player_goal": self.player_goal,
-            "dialogue_history": self.dialogue_history or [],
-            "evaluation_criteria": self.evaluation_criteria or {
-                "consistency": 1.0,
-                "memory": 1.0,
-                "creativity": 1.0,
-                "goal_driven": 1.0
-            }
-        }
 
 class TaskManager:
 
@@ -57,9 +34,9 @@ class TaskManager:
         self.max_tasks = max_tasks
         
         self.task_pool: Dict[str, TaskData] = {}
-        self.assigned_tasks: Dict[str, Dict[str, List[str]]] = {}
+        self.assigned_tasks: Dict[str, Dict[str, List[str]]] = {}  # {miner_hotkey: {validator_hotkey: [task_ids]}}
         
-        self.file_positions: Dict[str, int] = {}
+        self.file_positions: Dict[str, int] = {}  # {file_path: current_position}
         self.used_task_ids: set = set()
         self.file_task_counts: Dict[str, int] = {}
         self.total_blocks_run: int = 0
@@ -73,7 +50,7 @@ class TaskManager:
                 return self.file_task_counts[file_path]
                 
             count = 0
-            with open(file_path, 'r', encoding="utf-8") as f:
+            with open(file_path, 'r',  encoding="utf-8") as f:
                 parser = ijson.parse(f)
                 for prefix, event, value in parser:
                     if prefix.endswith('.task_id'):
@@ -84,19 +61,20 @@ class TaskManager:
         except Exception as e:
             logging.error(f"Error counting tasks in file {file_path}: {e}")
             return 0
-            
+        
     def _load_tasks(self):
         try:
             if not os.path.exists(self.task_data_path):
-                # logging.warning(f"Task data path not found: {self.task_data_path}")
+                logging.warning(f"Task data path not found: {self.task_data_path}")
                 return
                 
             check_max_blocks = os.getenv("CHECK_MAX_BLOCKS", "false").lower() == "true"
             
             self.task_pool.clear()
             self.reset_all_assignments()
-            
+                
             if os.path.isfile(self.task_data_path):
+
                 self._load_task_file(self.task_data_path, check_max_blocks)
             elif os.path.isdir(self.task_data_path):
                 for filename in os.listdir(self.task_data_path):
@@ -106,7 +84,8 @@ class TaskManager:
                             break
                         self._load_task_file(file_path, check_max_blocks)
                         
-
+            logging.info(f"Loaded {len(self.task_pool)} tasks from {self.task_data_path}")
+            
         except Exception as e:
             logging.error(f"Error loading task data: {e}")
             
@@ -128,7 +107,7 @@ class TaskManager:
             tasks_loaded = 0
             skipped_tasks = 0
             
-            with open(file_path, 'r', encoding="utf-8") as f:
+            with open(file_path, 'r',  encoding="utf-8") as f:
                 parser = ijson.items(f, 'item')
                 
                 for task in parser:
@@ -151,13 +130,20 @@ class TaskManager:
                     )
                     self.task_pool[task_data.task_id] = task_data
                     tasks_loaded += 1
-                    
+
             new_position = current_position + tasks_loaded
             if new_position >= total_tasks:
                 new_position = 0
-            self.file_positions[file_path] = new_position
-            
 
+            self.file_positions[file_path] = new_position
+
+            logging.info(
+                f"Loaded {tasks_loaded} tasks from {file_path} "
+                f"(position: {current_position} -> {new_position}, "
+                f"total tasks: {total_tasks})"
+            )
+            self._save_state()
+                
         except Exception as e:
             logging.error(f"Error loading task file {file_path}: {e}")
             
@@ -204,11 +190,15 @@ class TaskManager:
     def reset_all_assignments(self):
         self.assigned_tasks.clear()
         self._save_state()
-
+        logging.info("Reset all task assignments")
+            
     def get_task_for_miner(self, miner_hotkey: str, validator_hotkey: str) -> Optional[TaskData]:
+        print("get_task_for_miner start.....")
         try:
             check_max_blocks = os.getenv("CHECK_MAX_BLOCKS", "false").lower() == "true"
+            logging.info(f"get_task_for_miner check_max_blocks {check_max_blocks} ,total_blocks_run: {self.total_blocks_run}")
             if check_max_blocks and self.total_blocks_run >= MAX_VALIDATOR_BLOCKS:
+                logging.info(f"Reached maximum validator blocks ({MAX_VALIDATOR_BLOCKS}), no more tasks will be provided")
                 return None
             
             available_tasks = [
@@ -217,6 +207,7 @@ class TaskManager:
             ]
             
             if not available_tasks:
+                logging.info(f"get_task_for_miner available_tasks")
                 self.task_pool.clear()
                 
                 if not check_max_blocks:
@@ -231,8 +222,10 @@ class TaskManager:
                     task for task in self.task_pool.values()
                     if not task.completed
                 ]
+                logging.info(f"get_task_for_miner available_tasks: {len(available_tasks)}")
                 if not available_tasks:
-                    return None
+                    logging.warning("No available tasks after reload")
+                return None
                 
             miner_tasks = self.assigned_tasks.get(miner_hotkey, {})
             validator_tasks = miner_tasks.get(validator_hotkey, [])
@@ -241,12 +234,15 @@ class TaskManager:
                 task for task in available_tasks
                 if task.task_id not in validator_tasks
             ]
-
+            
+            logging.info(f"get_task_for_miner unassigned_tasks: {len(unassigned_tasks)}")
             if not unassigned_tasks:
+                logging.warning(f"No unassigned tasks for miner {miner_hotkey}")
                 return None
                 
             task = random.choice(unassigned_tasks)
-
+            
+            logging.info(f"get_task_for_miner task: {task}")
             if miner_hotkey not in self.assigned_tasks:
                 self.assigned_tasks[miner_hotkey] = {}
             if validator_hotkey not in self.assigned_tasks[miner_hotkey]:
@@ -258,9 +254,11 @@ class TaskManager:
                 self.used_task_ids.add(task.task_id)
             
             self._save_state()
+            logging.info(f"get_task_for_miner return task: {task}")
             return task
             
         except Exception as e:
+            logging.error(f"Error getting task for miner: {e}")
             return None
             
     def mark_task_completed(self, task_id: str, success: bool = True):
@@ -284,3 +282,106 @@ class TaskManager:
         if miner_hotkey in self.assigned_tasks:
             del self.assigned_tasks[miner_hotkey]
             self._save_state() 
+
+    def add_task(self, task_data: TaskData):
+        self.task_pool[task_data.task_id] = task_data
+        self._save_state()
+
+    def add_tasks(self, tasks: list):
+        for task_data in tasks:
+            self.task_pool[task_data.task_id] = task_data
+        self._save_state() 
+
+    @lru_cache(maxsize=1)
+    def get_cached_markov_model(self):
+        try:
+            dataset = load_dataset("assets/caption_data/data")
+        except FileNotFoundError:
+            dataset = load_dataset("validator/control_node/assets/caption_data/data")
+        text = [i["query"] for i in dataset["train"]]
+        return markovify.Text(" ".join(text))
+
+    async def markov_model_factory(self):
+        return await asyncio.to_thread(self.get_cached_markov_model)
+
+    async def _get_markov_sentence(self, max_words: int = 10) -> str:
+        markov_text_generation_model = await self.markov_model_factory()
+        text = None
+        while text is None:
+            text = markov_text_generation_model.make_sentence(max_words=max_words)
+        return text
+
+    async def generate_text_task(self, max_words: int = 10) -> TaskData:
+        text = await self._get_markov_sentence(max_words=max_words)
+        return TaskData(
+            task_id=f"markov_{hash(text)}",
+            text=text,
+            metadata={"category": TaskType.TEXT_CLASSIFICATION.value},
+            ground_truth=None,
+            difficulty=1.0
+        )
+
+    async def generate_text2img_task(self, max_words: int = 10) -> TaskData:
+        text = await self._get_markov_sentence(max_words=max_words)
+        return TaskData(
+            task_id=f"text2img_{hash(text)}",
+            text=text,
+            metadata={"category": TaskType.SENTIMENT_ANALYSIS.value, "type": "text2img"},
+            ground_truth=None,
+            difficulty=1.2
+        )
+
+    def get_default_images(self, image_dir: str = "assets/default_images") -> list:
+        image_paths = glob.glob(f"{image_dir}/*.png") + glob.glob(f"{image_dir}/*.jpg") + glob.glob(f"{image_dir}/*.jpeg")
+        return image_paths
+
+    def pil_to_base64(self, pil_image: Image.Image) -> str:
+        buffered = BytesIO()
+        pil_image.save(buffered, format="PNG")
+        return base64.b64encode(buffered.getvalue()).decode()
+
+    def alter_image(self, pil_image: Image.Image) -> str:
+        for _ in range(3):
+            rand_x, rand_y = (
+                random.randint(0, pil_image.width - 1),
+                random.randint(0, pil_image.height - 1),
+            )
+            pixel = list(pil_image.getpixel((rand_x, rand_y)))
+            for i in range(3):
+                change = random.choice([-1, 1])
+                pixel[i] = max(0, min(255, pixel[i] + change))
+            pil_image.putpixel((rand_x, rand_y), tuple(pixel))
+        if pil_image.mode == "RGBA":
+            pil_image = pil_image.convert("RGB")
+        return self.pil_to_base64(pil_image)
+
+    async def generate_img2img_task(self) -> TaskData:
+        # 随机选取一张默认图片
+        image_paths = self.get_default_images()
+        if not image_paths:
+            raise ValueError("未找到默认图片")
+        image_path = random.choice(image_paths)
+        pil_image = Image.open(image_path)
+        base64_img = self.alter_image(pil_image)
+        return TaskData(
+            task_id=f"img2img_{hash(base64_img)}",
+            text="[Image2Image task]",
+            metadata={"category": TaskType.SCENE_UNDERSTANDING.value, "type": "img2img", "base64_image": base64_img},
+            ground_truth=None,
+            difficulty=1.5
+        )
+
+    async def generate_tasks(self, task_type: TaskType, count: int = 1, max_words: int = 10) -> list:
+        tasks = []
+        for _ in range(count):
+            if task_type == TaskType.TEXT_CLASSIFICATION:
+                task = await self.generate_text_task(max_words=max_words)
+            elif task_type == TaskType.SENTIMENT_ANALYSIS:
+                task = await self.generate_text2img_task(max_words=max_words)
+            elif task_type == TaskType.SCENE_UNDERSTANDING:
+                task = await self.generate_img2img_task()
+            else:
+                raise ValueError("不支持的任务类型")
+            tasks.append(task)
+        self.add_tasks(tasks)
+        return tasks 
