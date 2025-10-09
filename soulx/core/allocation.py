@@ -63,7 +63,11 @@ class StakeBasedAllocation(BaseAllocationStrategy):
             blocks = min(blocks, remaining_blocks)
 
             uid = metagraph.hotkeys.index(validator)
-
+            bt.logging.info(
+                f"Validator {uid}:  stake_weight={stake/total_stake:.4f}, "
+                f"fair_share={fair_share}, allocated={blocks}"
+            )
+            
             allocations.append(
                 TaskAllocation(
                     validator_hotkey=validator,

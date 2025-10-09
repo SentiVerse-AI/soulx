@@ -151,13 +151,7 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
-
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-.idea/
+.idea
 
 testing/
 
@@ -165,27 +159,16 @@ testing/
 .DS_Store
 
 # Improve
-cognify/miner/proxy/braiins_farm/config/
-/data/
-/docker/
-/docs/备忘.txt
-/docs/流程说明.md
-/examples/
-/logs/
-/model/
-/scripts/
-/tests/ecommerce_to_json.py
-/tests/estimate_subnet_alpha.py
-/tests/stake_add.py
-/tests/wallet_deployment_manager.py
-/wallets/
-/.env.miner
-/.env.validator
-/Dockerfile
-/Dockerfile-validator
-/tasks/npc_tasks.jsonl
+soulx/miner/proxy/braiins_farm/config/
+/tests/available_miners_checker.py
 /tests/
-img.png
-/soulx/tests/
-/tasks/npc_dialogue_dataset_en.jsonl
-/tasks/example_npc_tasks.jsonl
+/scripts/
+/api_server/
+/examples/
+/docs/
+/requirements_miner.txt
+/requirements_validator.txt
+/data/
+/logs/
+/.env.validator
+/multimodal_server/.idea/

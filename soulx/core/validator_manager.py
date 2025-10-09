@@ -48,9 +48,10 @@ class ValidatorManager:
                 self.validators[hotkey] = ValidatorInfo(**info)
                 
             self.current_locked_validator = state.get("current_locked_validator")
-
+            logging.info(f"Loaded validator state: {len(self.validators)} validators")
+            
         except Exception as e:
-            # logging.error(f"Failed to load validator state: {e}")
+            logging.error(f"Failed to load validator state: {e}")
             self.validators = {}
             self.current_locked_validator = None
             
@@ -81,6 +82,7 @@ class ValidatorManager:
                         "current_locked_validator": self.current_locked_validator
                     }
                     self.storage.set("validator_state", state)
+                    logging.info("Successfully saved state after cleaning up corrupted file")
                 except Exception as retry_e:
                     logging.error(f"Failed to save state even after cleanup: {retry_e}")
             else:
@@ -101,6 +103,7 @@ class ValidatorManager:
             
         if (validator.locked_since_block and 
             self.current_block - validator.locked_since_block >= validator.lock_duration_blocks):
+            logging.info(f"Lock expired for validator {self.current_locked_validator}")
             self._unlock_validator()
             
     def _update_validator_status(self):
@@ -113,6 +116,7 @@ class ValidatorManager:
             validator.reputation_score *= self.reputation_decay_rate
             
     def can_serve_validator(self, validator_hotkey: str) -> bool:
+
         if validator_hotkey not in self.validators:
             self.validators[validator_hotkey] = ValidatorInfo(
                 hotkey=validator_hotkey,
@@ -148,6 +152,7 @@ class ValidatorManager:
         validator.lock_duration_blocks = duration_blocks or self.default_lock_duration
         self.current_locked_validator = validator_hotkey
         
+        logging.info(f"Locked validator {validator_hotkey} for {validator.lock_duration_blocks} blocks")
         self._save_state()
         return True
         
@@ -168,7 +173,6 @@ class ValidatorManager:
                                validator_hotkey: str, 
                                success: bool, 
                                response_time: float):
-
         if validator_hotkey not in self.validators:
             self.validators[validator_hotkey] = ValidatorInfo(
                 hotkey=validator_hotkey,
@@ -243,7 +247,7 @@ class ValidatorManager:
             
         enable_recent_failures = os.getenv("ENABLE_RECENT_FAILURES", "false").lower() == "true"
         recent_failures = miner_history.get("recent_failures", 0)
-        if enable_recent_failures and  recent_failures >= 10:
+        if enable_recent_failures and  recent_failures >= 20:
             logging.warning(f"Miner {miner_uid} has too many recent failures: {recent_failures}")
             return False
             

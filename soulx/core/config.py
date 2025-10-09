@@ -2,13 +2,14 @@ from dataclasses import dataclass
 from typing import Optional
 
 @dataclass
-class SoulXConfig:
+class CognifyConfig:
+
     stake_weight_ratio: float = 0.2
     min_blocks_per_validator: int = 10
     eval_interval: int = 25
     weights_interval: int = 100
     
-    model_name: str = "SentiVerse-AI/SoulX"
+    model_name: str = "distilbert-base-uncased-finetuned-sst-2-english"
     max_sequence_length: int = 512
     batch_size: int = 32
     response_timeout: float = 12.0

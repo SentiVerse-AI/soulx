@@ -17,25 +17,22 @@ class HardwareChecker:
         "cuda_version": "11.8"
     }
 
-    @staticmethod
-    def get_check_config():
-        return {
-            "check_cuda": os.getenv("CHECK_CUDA", "true").lower() == "true",
-            "check_gpu_memory": os.getenv("CHECK_GPU_MEMORY", "true").lower() == "true",
-            "check_cpu": os.getenv("CHECK_CPU", "true").lower() == "true",
-            "check_ram": os.getenv("CHECK_RAM", "true").lower() == "true",
-            "check_disk": os.getenv("CHECK_DISK", "true").lower() == "true",
-            "check_model": os.getenv("CHECK_MODEL", "true").lower() == "true"
-        }
+    CHECK_CONFIG = {
+        "check_cuda": os.getenv("CHECK_CUDA", "false").lower() == "true",
+        "check_gpu_memory": os.getenv("CHECK_GPU_MEMORY", "false").lower() == "true",
+        "check_cpu": os.getenv("CHECK_CPU", "false").lower() == "true",
+        "check_ram": os.getenv("CHECK_RAM", "false").lower() == "true",
+        "check_disk": os.getenv("CHECK_DISK", "false").lower() == "true",
+        "check_model": os.getenv("CHECK_MODEL", "false").lower() == "true"
+    }
     
     @staticmethod
     def check_hardware() -> Tuple[bool, Dict[str, str]]:
+
         results = {}
         passed = True
         
-        check_config = HardwareChecker.get_check_config()
-        
-        if check_config["check_cuda"]:
+        if HardwareChecker.CHECK_CONFIG["check_cuda"]:
             if not torch.cuda.is_available():
                 results["cuda"] = "CUDA not available"
                 return False, results
@@ -52,9 +49,9 @@ class HardwareChecker:
         else:
             results["cuda"] = "CUDA check skipped"
             
-        if check_config["check_gpu_memory"]:
+        if HardwareChecker.CHECK_CONFIG["check_gpu_memory"]:
             try:
-                gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+                gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3  # 转换为 GB
                 if gpu_memory < HardwareChecker.RECOMMENDED_SPECS["gpu_memory"]:
                     results["gpu_memory"] = f"GPU memory {gpu_memory:.1f}GB is lower than recommended {HardwareChecker.RECOMMENDED_SPECS['gpu_memory']}GB"
                     passed = False
@@ -66,7 +63,7 @@ class HardwareChecker:
         else:
             results["gpu_memory"] = "GPU memory check skipped"
             
-        if check_config["check_cpu"]:
+        if HardwareChecker.CHECK_CONFIG["check_cpu"]:
             cpu_cores = psutil.cpu_count(logical=False)
             if cpu_cores < HardwareChecker.RECOMMENDED_SPECS["cpu_cores"]:
                 results["cpu_cores"] = f"CPU cores {cpu_cores} is lower than recommended {HardwareChecker.RECOMMENDED_SPECS['cpu_cores']}"
@@ -76,7 +73,7 @@ class HardwareChecker:
         else:
             results["cpu_cores"] = "CPU check skipped"
             
-        if check_config["check_ram"]:
+        if HardwareChecker.CHECK_CONFIG["check_ram"]:
             ram_gb = psutil.virtual_memory().total / 1024**3
             if ram_gb < HardwareChecker.RECOMMENDED_SPECS["ram"]:
                 results["ram"] = f"RAM {ram_gb:.1f}GB is lower than recommended {HardwareChecker.RECOMMENDED_SPECS['ram']}GB"
@@ -86,7 +83,7 @@ class HardwareChecker:
         else:
             results["ram"] = "RAM check skipped"
             
-        if check_config["check_disk"]:
+        if HardwareChecker.CHECK_CONFIG["check_disk"]:
             disk = psutil.disk_usage("/")
             disk_gb = disk.free / 1024**3
             if disk_gb < HardwareChecker.RECOMMENDED_SPECS["disk_space"]:
@@ -105,7 +102,7 @@ class HardwareChecker:
     @staticmethod
     def check_model_availability(model_name: str) -> Tuple[bool, str]:
 
-        if not HardwareChecker.get_check_config()["check_model"]:
+        if not HardwareChecker.CHECK_CONFIG["check_model"]:
             return True, "Model check skipped"
             
         try:

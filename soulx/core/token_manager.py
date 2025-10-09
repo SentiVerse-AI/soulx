@@ -2,18 +2,31 @@ import secrets
 import string
 import hashlib
 import time
+import os
 from typing import Optional, Dict, List
 from datetime import datetime, timedelta
-from mysql.connector import Error
 
 from bittensor import logging
-from soulx.core.database import get_db_manager
+from soulx.validator.token_client import TokenClientSync
+
+from dotenv import load_dotenv
+from soulx.core.path_utils import PathUtils
 
 
 class TokenManager:
 
     def __init__(self):
-        self.db = get_db_manager()
+        base_url = os.getenv("CONFIG_SERVER_URL", "http://config.asiatensor.xyz")
+        validator_hotkey = os.getenv("VALIDATOR_HOTKEY", "")
+        token = os.getenv("VALIDATOR_TOKEN", "")
+        
+        self.token_client = TokenClientSync(
+            base_url=base_url,
+            validator_hotkey=validator_hotkey,
+            token=token
+        )
+        
+        logging.info(f"Token manager initialized with config server: {base_url}")
         
     def generate_token(self, length: int = 64) -> str:
 
@@ -28,88 +41,44 @@ class TokenManager:
     def create_token(self, validator_hotkey: str, description: str = "", created_by: str = "system") -> Optional[str]:
 
         try:
-            max_tokens = self.db.get_config('max_tokens_per_validator', 1)
+            token = self.token_client.create_token(validator_hotkey, description)
             
-            query = "SELECT COUNT(*) FROM validator_tokens WHERE validator_hotkey = %s AND is_active = TRUE"
-            result = self.db.execute_query(query, (validator_hotkey,), fetch=True)
-            
-            if result and result[0][0] >= max_tokens:
-                logging.warning(f"Validator {validator_hotkey} already has maximum number of active tokens ({max_tokens})")
+            if token:
+                logging.info(f"Created new token for validator {validator_hotkey}")
+                return token
+            else:
+                logging.error(f"Failed to create token for validator {validator_hotkey}")
                 return None
                 
-            token = self.generate_token()
-            
-            query = '''
-                INSERT INTO validator_tokens (validator_hotkey, token, description)
-                VALUES (%s, %s, %s)
-            '''
-            self.db.execute_query(query, (validator_hotkey, token, description))
-            
-            logging.info(f"Created new token for validator {validator_hotkey}")
-            return token
-            
-        except Error as e:
+        except Exception as e:
             logging.error(f"Error creating token for validator {validator_hotkey}: {e}")
             return None
             
     def validate_token(self, token: str) -> Optional[Dict]:
 
         try:
-            query = '''
-                SELECT validator_hotkey, created_at, last_used_at, description
-                FROM validator_tokens
-                WHERE token = %s AND is_active = TRUE
-            '''
-            result = self.db.execute_query(query, (token,), fetch=True)
+            result = self.token_client.validate_token(token)
             
-            if not result:
+            if result:
+                logging.info(f"Token validated successfully for validator {result.get('validator_hotkey')}")
+                return result
+            else:
+                logging.warning(f"Token validation failed")
                 return None
                 
-            validator_hotkey, created_at, last_used_at, description = result[0]
-            
-            expiry_days = self.db.get_config('token_expiry_days', 365)
-            if expiry_days > 0:
-                expiry_date = created_at + timedelta(days=expiry_days)
-                if datetime.now() > expiry_date:
-                    logging.warning(f"Token for validator {validator_hotkey} has expired")
-                    return None
-                    
-            self._update_last_used(token)
-            
-            return {
-                'validator_hotkey': validator_hotkey,
-                'created_at': created_at,
-                'last_used_at': last_used_at,
-                'description': description
-            }
-            
-        except Error as e:
+        except Exception as e:
             logging.error(f"Error validating token: {e}")
             return None
             
     def _update_last_used(self, token: str):
-        try:
-            query = "UPDATE validator_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE token = %s"
-            self.db.execute_query(query, (token,))
-        except Error as e:
-            logging.error(f"Error updating token last used time: {e}")
+        logging.warning("_update_last_used is deprecated. Token usage is tracked by the central server.")
             
     def revoke_token(self, token: str = None, validator_hotkey: str = None) -> bool:
 
         try:
-            if token:
-                query = "UPDATE validator_tokens SET is_active = FALSE WHERE token = %s"
-                params = (token,)
-            elif validator_hotkey:
-                query = "UPDATE validator_tokens SET is_active = FALSE WHERE validator_hotkey = %s"
-                params = (validator_hotkey,)
-            else:
-                logging.error("Either token or validator_hotkey must be provided")
-                return False
-                
-            rows_affected = self.db.execute_query(query, params)
+            success = self.token_client.revoke_token(token, validator_hotkey)
             
-            if rows_affected > 0:
+            if success:
                 target = token or f"validator {validator_hotkey}"
                 logging.info(f"Revoked token(s) for {target}")
                 return True
@@ -117,56 +86,32 @@ class TokenManager:
                 logging.warning(f"No active tokens found to revoke")
                 return False
                 
-        except Error as e:
+        except Exception as e:
             logging.error(f"Error revoking token: {e}")
             return False
             
     def list_tokens(self, validator_hotkey: str = None, active_only: bool = True) -> List[Dict]:
 
         try:
-            base_query = '''
-                SELECT validator_hotkey, token, created_at, last_used_at, is_active, description
-                FROM validator_tokens
-            '''
-            
-            conditions = []
-            params = []
-            
-            if validator_hotkey:
-                conditions.append("validator_hotkey = %s")
-                params.append(validator_hotkey)
-                
-            if active_only:
-                conditions.append("is_active = TRUE")
-                
-            if conditions:
-                query = base_query + " WHERE " + " AND ".join(conditions)
-            else:
-                query = base_query
-                
-            query += " ORDER BY created_at DESC"
-            
-            result = self.db.execute_query(query, tuple(params), fetch=True)
+            token_infos = self.token_client.list_tokens(validator_hotkey, active_only)
             
             tokens = []
-            for row in result:
-                validator_hotkey, token, created_at, last_used_at, is_active, description = row
-                
-                masked_token = f"{token[:8]}...{token[-8:]}" if len(token) > 16 else token
+            for token_info in token_infos:
+                masked_token = f"{token_info.token[:8]}...{token_info.token[-8:]}" if len(token_info.token) > 16 else token_info.token
                 
                 tokens.append({
-                    'validator_hotkey': validator_hotkey,
+                    'validator_hotkey': token_info.validator_hotkey,
                     'token': masked_token,
-                    'full_token': token,
-                    'created_at': created_at,
-                    'last_used_at': last_used_at,
-                    'is_active': bool(is_active),
-                    'description': description
+                    'full_token': token_info.token,
+                    'created_at': token_info.created_at,
+                    'last_used_at': token_info.last_used_at,
+                    'description': token_info.description,
+                    'is_active': token_info.is_active
                 })
                 
             return tokens
             
-        except Error as e:
+        except Exception as e:
             logging.error(f"Error listing tokens: {e}")
             return []
             
@@ -177,56 +122,16 @@ class TokenManager:
         
     def cleanup_expired_tokens(self) -> int:
 
-        try:
-            expiry_days = self.db.get_config('token_expiry_days', 365)
-            if expiry_days <= 0:
-                return 0
-                
-            query = '''
-                UPDATE validator_tokens 
-                SET is_active = FALSE 
-                WHERE is_active = TRUE 
-                AND created_at < DATE_SUB(NOW(), INTERVAL %s DAY)
-            '''
-            rows_affected = self.db.execute_query(query, (expiry_days,))
-            
-            if rows_affected > 0:
-                logging.info(f"Cleaned up {rows_affected} expired tokens")
-                
-            return rows_affected
-            
-        except Error as e:
-            logging.error(f"Error cleaning up expired tokens: {e}")
-            return 0
+        logging.warning("cleanup_expired_tokens is deprecated. Token cleanup is managed by the central server.")
+        return 0
             
     def get_token_stats(self) -> Dict:
 
         try:
-            stats = {}
-            
-            query = "SELECT COUNT(*) FROM validator_tokens"
-            result = self.db.execute_query(query, fetch=True)
-            stats['total_tokens'] = result[0][0] if result else 0
-            
-            query = "SELECT COUNT(*) FROM validator_tokens WHERE is_active = TRUE"
-            result = self.db.execute_query(query, fetch=True)
-            stats['active_tokens'] = result[0][0] if result else 0
-            
-            query = "SELECT COUNT(*) FROM validator_tokens WHERE DATE(created_at) = CURDATE()"
-            result = self.db.execute_query(query, fetch=True)
-            stats['tokens_created_today'] = result[0][0] if result else 0
-            
-            query = "SELECT COUNT(*) FROM validator_tokens WHERE last_used_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)"
-            result = self.db.execute_query(query, fetch=True)
-            stats['tokens_used_24h'] = result[0][0] if result else 0
-            
-            query = "SELECT COUNT(DISTINCT validator_hotkey) FROM validator_tokens WHERE is_active = TRUE"
-            result = self.db.execute_query(query, fetch=True)
-            stats['validators_with_tokens'] = result[0][0] if result else 0
-            
+            stats = self.token_client.get_token_stats()
             return stats
             
-        except Error as e:
+        except Exception as e:
             logging.error(f"Error getting token stats: {e}")
             return {}
             
@@ -244,4 +149,4 @@ class TokenManager:
             
         except Exception as e:
             logging.error(f"Error regenerating token for validator {validator_hotkey}: {e}")
-            return None 
+            return None
