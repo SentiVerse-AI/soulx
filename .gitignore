@@ -189,3 +189,4 @@ img.png
 /soulx/tests/
 /tasks/npc_dialogue_dataset_en.jsonl
 /tasks/example_npc_tasks.jsonl
+/tasks/
