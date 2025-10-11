@@ -9,7 +9,8 @@ from fiber.chain import chain_utils
 from dotenv import load_dotenv
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from substrateinterface import  Keypair
+from substrateinterface import Keypair
+import json
 
 from soulx.core.path_utils import PathUtils
 import base64
@@ -17,9 +18,9 @@ import base64
 from soulx.validator.contender_client import ContenderClient
 from soulx.validator.task_config_client import TaskConfigClient
 
-class ContenderAllocator:
 
-    def __init__(self, contender_client: ContenderClient, task_config_client: TaskConfigClient, 
+class ContenderAllocator:
+    def __init__(self, contender_client: ContenderClient, task_config_client: TaskConfigClient,
                  redis_host: str = "localhost", redis_port: int = 6379, redis_password: str = None,
                  node_handshake_data: Dict[str, Dict[str, Any]] = None):
         self.contender_client = contender_client
@@ -32,34 +33,134 @@ class ContenderAllocator:
         self.miner_tasks = {}
         self.task_history = {}
         self.validator_ss58_address = contender_client.validator_hotkey
+        self.redis_client = None
+        self.miner_task_expire_time = 1800
+    async def _get_redis_client(self):
+        if self.redis_client is None:
+            try:
+                from redis.asyncio import Redis
+                self.redis_client = Redis(
+                    host=self.redis_host,
+                    port=self.redis_port,
+                    password=self.redis_password,
+                    decode_responses=True,
+                    socket_connect_timeout=5,
+                    socket_timeout=5
+                )
+                await self.redis_client.ping()
+                logging.info("Redis client initialized successfully")
+            except Exception as e:
+                logging.error(f"Failed to initialize Redis client: {e}")
+                self.redis_client = None
+        return self.redis_client
+
+    async def _set_miner_task(self, miner_hotkey: str, task_id: str) -> bool:
+        try:
+            redis_client = await self._get_redis_client()
+            if redis_client is None:
+                logging.warning("Redis client not available, using memory fallback")
+                self.miner_tasks[miner_hotkey] = task_id
+                return True
+
+            key = f"miner_task:{miner_hotkey}"
+            task_data = {
+                'task_id': task_id,
+                'allocated_at': datetime.now().isoformat(),
+                'validator_hotkey': self.validator_ss58_address
+            }
+
+            await redis_client.setex(
+                key,
+                self.miner_task_expire_time,
+                json.dumps(task_data)
+            )
+            logging.debug(f"Set miner task in Redis: {miner_hotkey} -> {task_id}")
+            return True
+
+        except Exception as e:
+            logging.error(f"Error setting miner task in Redis: {e}")
+            self.miner_tasks[miner_hotkey] = task_id
+            return True
+
+    async def _get_miner_task(self, miner_hotkey: str) -> Optional[str]:
+        try:
+            redis_client = await self._get_redis_client()
+            if redis_client is None:
+                logging.warning("Redis client not available, using memory fallback")
+                return self.miner_tasks.get(miner_hotkey)
+
+            key = f"miner_task:{miner_hotkey}"
+            task_data_str = await redis_client.get(key)
+
+            if task_data_str:
+                task_data = json.loads(task_data_str)
+                task_id = task_data.get('task_id')
+                logging.debug(f"Found miner task in Redis: {miner_hotkey} -> {task_id}")
+                return task_id
+            else:
+                logging.debug(f"No miner task found in Redis for: {miner_hotkey}")
+                return None
+
+        except Exception as e:
+            logging.error(f"Error getting miner task from Redis: {e}")
+            return self.miner_tasks.get(miner_hotkey)
+
+    async def _remove_miner_task(self, miner_hotkey: str) -> bool:
+        try:
+            redis_client = await self._get_redis_client()
+            if redis_client is None:
+                logging.warning("Redis client not available, using memory fallback")
+                if miner_hotkey in self.miner_tasks:
+                    del self.miner_tasks[miner_hotkey]
+                return True
+
+            key = f"miner_task:{miner_hotkey}"
+            result = await redis_client.delete(key)
+            logging.debug(f"Removed miner task from Redis: {miner_hotkey}, result: {result}")
+            return True
+
+        except Exception as e:
+            logging.error(f"Error removing miner task from Redis: {e}")
+            if miner_hotkey in self.miner_tasks:
+                del self.miner_tasks[miner_hotkey]
+            return True
+
+    async def _check_miner_has_task(self, miner_hotkey: str) -> bool:
+        task_id = await self._get_miner_task(miner_hotkey)
+        return task_id is not None
 
     async def get_contenders_for_task(self, task_type: str, top_x: int = 5) -> List[Dict[str, Any]]:
         try:
             contenders = await self.contender_client.get_contenders_for_task(task_type, top_x)
-            
+
             if not contenders:
                 logging.warning(f"No contenders available for task type {task_type}")
                 return []
-            
+
             logging.info(f"Retrieved {len(contenders)} contenders for task {task_type}")
             return contenders
-            
+
         except Exception as e:
             logging.error(f"Error getting contenders for task {task_type}: {e}")
             return []
-    
+
     async def allocate_task_to_contender(self, task: Dict[str, Any], contender: Dict[str, Any]) -> bool:
         try:
             task_id = task.get('task_id')
             contender_id = contender.get('contender_id')
             miner_hotkey = contender.get('node_hotkey')
-            
-            if miner_hotkey in self.miner_tasks:
-                logging.warning(f"Miner {miner_hotkey} already has a task")
+
+            has_task = await self._check_miner_has_task(miner_hotkey)
+            if has_task:
+                existing_task = await self._get_miner_task(miner_hotkey)
+                logging.warning(f"Miner {miner_hotkey} already has a task: {existing_task}")
                 return False
-            
-            self.miner_tasks[miner_hotkey] = task_id
-            
+
+            success = await self._set_miner_task(miner_hotkey, task_id)
+            if not success:
+                logging.error(f"Failed to set miner task in Redis for {miner_hotkey}")
+                return False
+
             if task_id not in self.task_history:
                 self.task_history[task_id] = {
                     'task': task,
@@ -67,20 +168,20 @@ class ContenderAllocator:
                     'allocated_at': datetime.now(),
                     'status': 'allocated'
                 }
-            
+
             return True
-            
+
         except Exception as e:
             logging.error(f"Error allocating task to contender: {e}")
             return False
-    
+
     async def process_task_with_contender(self, task: Dict[str, Any], contender: Dict[str, Any]) -> bool:
         try:
             task_id = task.get('task_id')
             task_type = task.get('task_type')
             miner_hotkey = contender.get('node_hotkey')
             payload = task.get('query_payload', {})
-            
+
             task_config = await self._get_task_config(task_type)
             if task_config is None:
                 logging.error(f"Can't find the task {task_type} in the query node!")
@@ -98,66 +199,66 @@ class ContenderAllocator:
                 payload['init_image'] = image_b64
 
             is_stream = payload.get('stream', False)
-            
+
             start_time = time.time()
-            
+
             await self._update_contender_requests_made(contender)
-            
+
             success = False
-            
+
             try:
                 if is_stream:
                     success = await self._handle_stream_query(task, contender, payload, start_time)
                 else:
                     success = await self._handle_nonstream_query(task, contender, payload, start_time)
-                
+
             except Exception as e:
-                logging.error(f"Error when querying contender {contender.get('contender_id')} for task {task_type}: {e}")
+                logging.error(
+                    f"Error when querying contender {contender.get('contender_id')} for task {task_type}: {e}")
                 success = False
-            
+
             if success:
+                logging.info(f"Task {task_id} processed successfully with contender {contender.get('contender_id')}")
 
                 if task_id in self.task_history:
                     self.task_history[task_id]['status'] = 'completed'
                     self.task_history[task_id]['completed_at'] = datetime.now()
-                
+
                 await self._update_contender_stats(contender, success=True)
-                
-                if miner_hotkey in self.miner_tasks:
-                    del self.miner_tasks[miner_hotkey]
+
+                await self._remove_miner_task(miner_hotkey)
             else:
-                logging.warning(f"Task {task_id} failed with contender ")
-                
+                logging.warning(f"Task {task_id} failed with contender {contender.get('contender_id')}")
+
                 if task_id in self.task_history:
                     self.task_history[task_id]['status'] = 'failed'
                     self.task_history[task_id]['failed_at'] = datetime.now()
-                
+
                 await self._update_contender_stats(contender, success=False)
-                
-                if miner_hotkey in self.miner_tasks:
-                    del self.miner_tasks[miner_hotkey]
-            
+
+                await self._remove_miner_task(miner_hotkey)
+
             return success
-            
+
         except Exception as e:
             logging.error(f"Error processing task with contender: {e}")
             return False
-    
+
     async def _get_task_config(self, task_type: str) -> Optional[Dict[str, Any]]:
         try:
             task_config = await self.task_config_client.get_task_config(task_type)
-            
+
             if task_config:
                 logging.debug(f"Retrieved task config for {task_type}: {task_config}")
                 return task_config
             else:
                 logging.warning(f"Task config not found for {task_type}")
                 return None
-                
+
         except Exception as e:
             logging.error(f"Error getting task config for {task_type}: {e}")
             return self._get_default_task_config(task_type)
-    
+
     def _get_default_task_config(self, task_type: str) -> Optional[Dict[str, Any]]:
         default_configs = {
             'chat-llama-3-2-3b': {
@@ -166,7 +267,7 @@ class ContenderAllocator:
                 'timeout': 30,
                 'response_model': 'text',
                 'task_type': 'text',
-                'description': 'chat - stream',
+                'description': 'Chat Llama 3 8B',
                 'max_capacity': 1.0,
                 'weight': 1.0,
                 'enabled': True,
@@ -179,7 +280,7 @@ class ContenderAllocator:
                 'timeout': 60,
                 'response_model': 'text',
                 'task_type': 'text',
-                'description': 'chat - 8B',
+                'description': 'Chat Llama 3 8B',
                 'max_capacity': 1.0,
                 'weight': 1.0,
                 'enabled': True,
@@ -192,7 +293,7 @@ class ContenderAllocator:
                 'timeout': 60,
                 'response_model': 'image',
                 'task_type': 'image',
-                'description': 'text to image',
+                'description': 'Text to Image',
                 'max_capacity': 1.0,
                 'weight': 1.0,
                 'enabled': True,
@@ -205,7 +306,7 @@ class ContenderAllocator:
                 'timeout': 60,
                 'response_model': 'image',
                 'task_type': 'image',
-                'description': 'image to image',
+                'description': 'Image to Image',
                 'max_capacity': 1.0,
                 'weight': 1.0,
                 'enabled': True,
@@ -218,7 +319,7 @@ class ContenderAllocator:
                 'timeout': 45,
                 'response_model': 'image',
                 'task_type': 'image',
-                'description': 'avatar',
+                'description': 'Avatar',
                 'max_capacity': 1.0,
                 'weight': 1.0,
                 'enabled': True,
@@ -231,7 +332,7 @@ class ContenderAllocator:
                 'timeout': 30,
                 'response_model': 'text',
                 'task_type': 'text',
-                'description': 'text',
+                'description': 'Visual Language',
                 'max_capacity': 1.0,
                 'weight': 1.0,
                 'enabled': True,
@@ -239,62 +340,64 @@ class ContenderAllocator:
                 'is_reasoning': True
             }
         }
-        
+
         return default_configs.get(task_type)
-    
+
     async def _update_contender_requests_made(self, contender: Dict[str, Any]):
         try:
             contender_id = contender.get('contender_id')
             if not contender_id:
                 return
-            
+
             current_requests = contender.get('total_requests_made', 0)
             contender['total_requests_made'] = current_requests + 1
-            
+
             current_synthetic_requests = contender.get('synthetic_requests_made', 0)
             contender['synthetic_requests_made'] = current_synthetic_requests + 1
-            
+
         except Exception as e:
             logging.error(f"Error updating contender requests made: {e}")
-    
-    async def _handle_stream_query(self, task: Dict[str, Any], contender: Dict[str, Any], payload: Dict[str, Any], start_time: float) -> bool:
+
+    async def _handle_stream_query(self, task: Dict[str, Any], contender: Dict[str, Any], payload: Dict[str, Any],
+                                   start_time: float) -> bool:
         try:
             task_id = task.get('task_id')
             task_type = task.get('task_type')
             miner_hotkey = contender.get('node_hotkey')
-            
-            logging.debug(f"Querying contender {contender.get('contender_id')} for task {task_type} with payload: {payload}")
-            
+
+            logging.debug(
+                f"Querying contender {contender.get('contender_id')} for task {task_type} with payload: {payload}")
+
             from soulx.validator.query.streaming import query_node_stream, consume_generator
-            
+
             config = self._create_config_for_query()
             if config is None:
                 logging.error("Failed to create config for query")
                 return False
-            
+
             node = await self._create_node_for_query(contender, config)
             if node is None:
                 logging.error("Failed to create node for query")
                 return False
-            
+
             contender_obj = await self._create_contender_obj(contender)
             if contender_obj is None:
                 logging.error("Failed to create contender object")
                 return False
-            
+
             job_id = f"task_{task_id}_{int(start_time)}"
-            
+
             task_config = await self._get_task_config(task_type)
             if task_config is None:
                 logging.error(f"Task config not found for task type: {task_type}")
                 return False
-            
+
             generator = await query_node_stream(config, contender_obj, node, payload, task_config)
-            
+
             if generator is None:
                 logging.error(f"Failed to get generator for task {task_id}")
                 return False
-            
+
             success = await consume_generator(
                 config=config,
                 generator=generator,
@@ -306,51 +409,51 @@ class ContenderAllocator:
                 start_time=start_time,
                 task_config=task_config
             )
-            
+
             if success:
                 response_time = time.time() - start_time
             else:
-                logging.warning(f"Stream query failed for task {task_id} with contender {contender.get('contender_id')}")
-            
+                logging.warning(
+                    f"Stream query failed for task  with contender {contender.get('contender_id')}")
+
             return success
-            
+
         except Exception as e:
             logging.error(f"Error in stream query: {e}")
             return False
-    
-    async def _handle_nonstream_query(self, task: Dict[str, Any], contender: Dict[str, Any], payload: Dict[str, Any], start_time: float) -> bool:
+
+    async def _handle_nonstream_query(self, task: Dict[str, Any], contender: Dict[str, Any], payload: Dict[str, Any],
+                                      start_time: float) -> bool:
         try:
             task_id = task.get('task_id')
             task_type = task.get('task_type')
             miner_hotkey = contender.get('node_hotkey')
-            
-            logging.debug(f"Querying contender {contender.get('contender_id')} for task {task_type} with payload: {payload}")
-            
+
             from soulx.validator.query.nonstream import query_nonstream
             from soulx.core.models.payload_models import ImageResponse
-            
+
             config = self._create_config_for_query()
             if config is None:
                 logging.error("Failed to create config for query")
                 return False
-            
+
             node = await self._create_node_for_query(contender, config)
             if node is None:
                 logging.error("Failed to create node for query")
                 return False
-            
+
             contender_obj = await self._create_contender_obj(contender)
             if contender_obj is None:
                 logging.error("Failed to create contender object")
                 return False
-            
+
             job_id = f"task_{task_id}_{int(start_time)}"
 
             task_config = await self._get_task_config(task_type)
             if task_config is None:
                 logging.error(f"Task config not found for task type: {task_type}")
                 return False
-            
+
             success, query_result = await query_nonstream(
                 config=config,
                 contender=contender_obj,
@@ -360,20 +463,22 @@ class ContenderAllocator:
                 job_id=job_id,
                 task_config=task_config
             )
-            
+
             if success:
                 response_time = time.time() - start_time
-                logging.info(f"Non-stream query successful for task {task_id} with contender {contender.get('contender_id')} - time: {response_time:.2f}s")
+                logging.info(
+                    f"Non-stream query successful for task {task_id} with contender {contender.get('contender_id')} - time: {response_time:.2f}s")
             else:
-                logging.warning(f"Non-stream query failed for task {task_id} with contender {contender.get('contender_id')}")
-            
+                logging.warning(
+                    f"Non-stream query failed for task {task_id} with contender {contender.get('contender_id')}")
+
             return success
-            
+
         except Exception as e:
             logging.error(f"Error in non-stream query: {e}")
             return False
 
-    def load_hotkey_keypair_from_seed(self,secret_seed: str) -> Keypair:
+    def load_hotkey_keypair_from_seed(self, secret_seed: str) -> Keypair:
         try:
             keypair = Keypair.create_from_seed(secret_seed)
             logging.info("Loaded keypair from seed directly!")
@@ -381,21 +486,20 @@ class ContenderAllocator:
         except Exception as e:
             raise ValueError(f"Failed to load keypair: {str(e)}")
 
-
     def _create_config_for_query(self):
         try:
             from soulx.validator.query.query_config import Config
             from fiber import Keypair
             from redis.asyncio import Redis
             import httpx
-            
+
             redis_db = Redis(
                 host=os.getenv('REDIS_HOST', 'localhost'),
                 port=int(os.getenv('REDIS_PORT', 6379)),
                 password=os.getenv('REDIS_PASSWORD'),
                 decode_responses=True
             )
-            
+
             keypair = Keypair.create_from_uri("//Alice")
             wallet_name = os.getenv("BT_WALLET_NAME", "default")
             hotkey_name = os.getenv("BT_WALLET_HOTKEY", "default")
@@ -419,29 +523,29 @@ class ContenderAllocator:
                 raise
 
             httpx_client = httpx.AsyncClient(timeout=30)
-            
+
             config = Config(
                 keypair=keypair,
                 redis_db=redis_db,
                 ss58_address=self.validator_ss58_address,
-                netuid=int(os.getenv('NETUID', 115)),
+                netuid=int(os.getenv('NETUID', 0)),
                 httpx_client=httpx_client,
                 replace_with_localhost=os.getenv('REPLACE_WITH_LOCALHOST', 'false').lower() == 'true',
                 replace_with_docker_localhost=os.getenv('REPLACE_WITH_DOCKER_LOCALHOST', 'false').lower() == 'true'
             )
-            
+
             return config
-            
+
         except Exception as e:
             logging.error(f"Error creating config for query: {e}")
             return None
-    
+
     async def _create_node_for_query(self, contender: Dict[str, Any], config):
         try:
             from fiber.encrypted.networking.models import NodeWithFernet as Node
             from cryptography.fernet import Fernet
             import uuid
-            
+
             node_hotkey = contender.get('node_hotkey')
             if not node_hotkey:
                 logging.error("No node_hotkey found in contender")
@@ -517,15 +621,15 @@ class ContenderAllocator:
             )
 
             return node
-            
+
         except Exception as e:
             logging.error(f"Error creating node for query: {e}")
             return None
-    
+
     async def _create_contender_obj(self, contender: Dict[str, Any]):
         try:
             from soulx.validator.models import Contender
-            
+
             contender_obj = Contender(
                 contender_id=contender.get('contender_id', ''),
                 node_hotkey=contender.get('node_hotkey', ''),
@@ -541,111 +645,143 @@ class ContenderAllocator:
                 requests_500=contender.get('requests_500', 0),
                 period_score=contender.get('period_score', 0.0)
             )
-            
+
             return contender_obj
-            
+
         except Exception as e:
             logging.error(f"Error creating contender object: {e}")
             return None
-    
+
     async def _update_contender_stats(self, contender: Dict[str, Any], success: bool):
         try:
             contender_id = contender.get('contender_id')
             if not contender_id:
                 return
-            
+
             stats = {
                 'total_requests_made': contender.get('total_requests_made', 0),
                 'requests_429': contender.get('requests_429', 0),
                 'requests_500': contender.get('requests_500', 0),
                 'period_score': contender.get('period_score', 0.0)
             }
-            
+
             if not success:
                 stats['requests_500'] += 1
-            
+
             await self.contender_client.update_contender_stats(contender_id, stats)
-            
+
         except Exception as e:
             logging.error(f"Error updating contender stats: {e}")
-    
+
     async def process_task_with_contenders(self, task: Dict[str, Any], contenders: List[Dict[str, Any]]) -> bool:
 
         task_id = task.get('task_id')
         max_retries = 3
         retry_delay = 30
-        
+
         for attempt in range(max_retries):
 
             contender_results = {}
             successful_contenders = []
-            
+
             for i, contender in enumerate(contenders):
                 contender_id = contender.get('contender_id')
                 miner_hotkey = contender.get('node_hotkey')
-                
-                if miner_hotkey in self.miner_tasks:
-                    logging.info(f"Contender {contender_id} is busy, skipping to next contender")
+
+                logging.info(f"Processing contender {i + 1}/{len(contenders)}: {contender_id}")
+
+                has_task = await self._check_miner_has_task(miner_hotkey)
+                if has_task:
+                    existing_task = await self._get_miner_task(miner_hotkey)
+                    logging.info(
+                        f"Contender  is busy with task {existing_task}, skipping to next contender")
                     contender_results[contender_id] = "skipped_busy"
                     continue
-                
+
                 allocated = await self.allocate_task_to_contender(task, contender)
                 if not allocated:
                     logging.warning(f"Failed to allocate task to contender {contender_id}")
                     contender_results[contender_id] = False
                     continue
-                
+
                 success = await self.process_task_with_contender(task, contender)
                 contender_results[contender_id] = success
-                
+
                 if success:
                     successful_contenders.append(contender_id)
                     logging.info(f"Contender  successfully processed task {task_id}")
                 else:
                     logging.warning(f" Contender  failed to process task {task_id}")
-                
+
                 await asyncio.sleep(0.1)
-            
+
             if successful_contenders:
                 return True
-            
+
             if attempt < max_retries - 1:
                 await asyncio.sleep(retry_delay)
-        
+
         logging.error(f"Failed to process task {task_id} after {max_retries} attempts with all contenders")
         return False
-    
+
     async def _wait_for_contender_availability(self, contenders: List[Dict[str, Any]], timeout: int = 30) -> bool:
 
         start_time = time.time()
         check_interval = 1
-        
+
         while time.time() - start_time < timeout:
             available_contenders = []
             for contender in contenders:
                 miner_hotkey = contender.get('node_hotkey')
-                if miner_hotkey not in self.miner_tasks:
+                has_task = await self._check_miner_has_task(miner_hotkey)
+                if not has_task:
                     available_contenders.append(contender)
-            
+
             if available_contenders:
                 logging.info(f"Found {len(available_contenders)} available contenders after waiting")
                 return True
-            
+
             await asyncio.sleep(check_interval)
-        
+
         logging.warning(f"No contenders became available within {timeout} seconds")
         return False
-    
-    def get_allocation_stats(self) -> Dict[str, Any]:
+
+    async def get_allocation_stats(self) -> Dict[str, Any]:
         total_tasks = len(self.task_history)
         completed_tasks = len([t for t in self.task_history.values() if t['status'] == 'completed'])
         failed_tasks = len([t for t in self.task_history.values() if t['status'] == 'failed'])
-        active_miners = len(self.miner_tasks)
-        
+
+        active_miners = 0
+        try:
+            redis_client = await self._get_redis_client()
+            if redis_client is not None:
+                keys = await redis_client.keys("miner_task:*")
+                active_miners = len(keys)
+            else:
+                active_miners = len(self.miner_tasks)
+        except Exception as e:
+            logging.error(f"Error getting active miners count: {e}")
+            active_miners = len(self.miner_tasks)
+
         return {
             'total_tasks': total_tasks,
             'completed_tasks': completed_tasks,
             'failed_tasks': failed_tasks,
             'success_rate': completed_tasks / total_tasks if total_tasks > 0 else 0,
-            'active_miners': active_miners
+            'active_miners': active_miners,
+            'redis_enabled': self.redis_client is not None
         }
+
+    async def cleanup(self):
+        try:
+            if self.redis_client is not None:
+                await self.redis_client.close()
+                logging.info("Redis client connection closed")
+        except Exception as e:
+            logging.error(f"Error closing Redis client: {e}")
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.cleanup()
