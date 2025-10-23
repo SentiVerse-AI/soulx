@@ -178,3 +178,4 @@ img.png
 /logs/
 /.env.validator
 /multimodal_server/.idea/
+gen.py
