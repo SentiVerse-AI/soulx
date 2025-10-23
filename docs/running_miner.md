@@ -93,15 +93,17 @@ cd ../.. # Return to the root dir
 cd multimodal_server
 cp .multimodal_server.example .env.multimodal_server
 ```
-### Option 2: Using Command-Line Arguments
-
-All settings can be passed as command-line arguments when starting the miner.
 
 4. Post IP's to chain
 Example command:
 ```bash
 fiber-post-ip --netuid 115 --subtensor.network finney --external_port 8091 --wallet.name default --wallet.hotkey default --external_ip 0.0.0.0
 ```
+
+
+### Option 2: Using Command-Line Arguments
+
+All settings can be passed as command-line arguments when starting the miner.
 
 ## 5. Running the miner
 
