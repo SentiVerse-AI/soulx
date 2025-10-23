@@ -15,17 +15,13 @@ sys.path.insert(0, str(project_root))
 def load_environment():
     from soulx.core.path_utils import PathUtils
     
-    logging.info("Loading Cognify Miner environment configuration...")
     miner_env = PathUtils.get_env_file_path("miner")
-    logging.info( f"miner_env path is : {miner_env}")
     if miner_env.exists():
         load_dotenv(miner_env)
-        logging.info(f"Loaded environment from: {miner_env}")
     else:
         default_env = project_root / ".env"
         if default_env.exists():
             load_dotenv(default_env)
-            logging.info(f"Loaded environment from: {default_env}")
         else:
             logging.warning("No .env file found")
 

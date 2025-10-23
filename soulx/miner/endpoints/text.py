@@ -22,7 +22,6 @@ async def chat_completions(
     multimodal_config: MultimodalConfig = Depends(get_multimodal_config),
 ) -> Response:
     try:
-        logger.info(f"chat_completions: {decrypted_payload}")
         if decrypted_payload.stream:
             generator = chat_stream(config.httpx_client, decrypted_payload, multimodal_config)
             return StreamingResponse(generator, media_type="text/event-stream")
@@ -49,7 +48,6 @@ async def completions(
     multimodal_config: MultimodalConfig = Depends(get_multimodal_config),
 ) -> Response:
     try:
-        logger.info(f"completions: {decrypted_payload}")
         if decrypted_payload.stream:
             generator = completion_stream(config.httpx_client, decrypted_payload, multimodal_config)
             return StreamingResponse(generator, media_type="text/event-stream")

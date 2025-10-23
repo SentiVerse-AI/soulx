@@ -18,7 +18,6 @@ async def capacity(
     validator_hotkey: str = Header(..., alias=fcst.VALIDATOR_HOTKEY),
     config: Config = Depends(get_config),
 ) -> dict[str, float | str]:
-    logger.info(f"Received task configs: {configs} from validator {validator_hotkey}. I should do something with this info...")
 
     my_miner_type = os.getenv("MINER_TYPE")
 
@@ -43,7 +42,6 @@ async def capacity(
         elif weight > 0:
             capacities[task] = max_capacity * validator_node.stake / total_stake
 
-    logger.debug(f"Returning capacities: {capacities}")
     return capacities
 
 

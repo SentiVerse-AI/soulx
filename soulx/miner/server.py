@@ -35,8 +35,6 @@ if my_miner_type not in TaskType._value2member_map_:
     allowed_values = ", ".join(TaskType._value2member_map_.keys())
     raise ValueError(f"MINER_TYPE {my_miner_type} is not valid. Please set the MINER_TYPE to one of the following: {allowed_values}")
 
-logger.info(f"Miner Server initialized with MINER_TYPE: {my_miner_type}")
-
 if __name__ == "__main__":
     import uvicorn
     

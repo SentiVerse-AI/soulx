@@ -32,8 +32,6 @@ async def chat_stream(
             "max_tokens": payload.max_tokens,
         }
         
-        logger.info(f"Sending chat request to multimodal server: {url}")
-        
         async with httpx_client.stream(
             "POST",
             url,
@@ -84,8 +82,6 @@ async def completion_stream(
             "temperature": payload.temperature,
             "max_tokens": payload.max_tokens,
         }
-        
-        logger.info(f"Sending completion request to multimodal server: {url}")
         
         async with httpx_client.stream(
             "POST",
@@ -138,8 +134,6 @@ async def chat_no_stream(
             "max_tokens": payload.max_tokens,
         }
         
-        logger.info(f"Sending chat text request to multimodal server: {url}")
-        
         response = await httpx_client.post(
             url,
             headers=headers,
@@ -181,8 +175,6 @@ async def completion_no_stream(
             "temperature": payload.temperature,
             "max_tokens": payload.max_tokens,
         }
-        
-        logger.info(f"Sending completion text request to multimodal server: {url}")
         
         response = await httpx_client.post(
             url,
